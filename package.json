@@ -1,0 +1,19 @@
+{
+  "name": "voiceflow",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "agent:dev": "pnpm --filter @voiceflow/backend dev",
+    "agent:start": "pnpm --filter @voiceflow/backend start",
+    "token:dev": "pnpm --filter @voiceflow/backend token:dev",
+    "typecheck": "pnpm --filter @voiceflow/backend typecheck",
+    "test": "pnpm --filter @voiceflow/backend test",
+    "frontend:dev": "pnpm --filter @voiceflow/frontend dev",
+    "frontend:build": "pnpm --filter @voiceflow/frontend build"
+  }
+}
+
