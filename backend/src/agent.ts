@@ -150,21 +150,10 @@ const agent = defineAgent({
         `[TURN] GENERATION_STARTED: New generation #${newGen.id} started`,
       );
 
-      try {
-        await session.generateReply({
-          instructions: ev.transcript,
-        });
-
-        logger.info(
-          { generationId: newGen.id },
-          `[TURN] LLM_REPLY_REQUESTED: Generation #${newGen.id} sent to LiveKit LLM`,
-        );
-      } catch (error) {
-        logger.error(
-          { error, generationId: newGen.id },
-          `[TURN] LLM_REPLY_FAILED: Generation #${newGen.id} failed`,
-        );
-      }
+      logger.info(
+  { transcript: ev.transcript },
+  '[TURN] FINAL TRANSCRIPT: letting LiveKit AgentSession handle the reply',
+);
     }
   },
 );
