@@ -68,9 +68,9 @@ const agent = defineAgent({
           maxDelay: 1500,
         },
         preemptiveGeneration: {
-          enabled: true,
-          preemptiveTts: true,
-        },
+  enabled: false,
+  preemptiveTts: false,
+},
       },
       connOptions: {
         llmConnOptions: {
