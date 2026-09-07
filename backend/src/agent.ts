@@ -127,23 +127,47 @@ const agent = defineAgent({
     });
 
     // 2. User input transcribed: finalized user turn starts a fresh generation
-    session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (ev) => {
+    session.on(
+  voice.AgentSessionEventTypes.UserInputTranscribed,
+  async (ev) => {
+    logger.info(
+      { transcript: ev.transcript, isFinal: ev.isFinal },
+      'Deepgram STT transcript received',
+    );
+
+    if (ev.isFinal && ev.transcript.trim().length > 0) {
       logger.info(
-        { transcript: ev.transcript, isFinal: ev.isFinal },
-        'Deepgram STT transcript received',
+        { transcript: ev.transcript },
+        `[TURN] FINAL TRANSCRIPT: User transcript finalized: "${ev.transcript}"`,
       );
-      if (ev.isFinal && ev.transcript.trim().length > 0) {
+
+      const newGen = coordinator.startGeneration({
+        transcript: ev.transcript,
+      });
+
+      logger.info(
+        { generationId: newGen.id, transcript: ev.transcript },
+        `[TURN] GENERATION_STARTED: New generation #${newGen.id} started`,
+      );
+
+      try {
+        await session.generateReply({
+          instructions: ev.transcript,
+        });
+
         logger.info(
-          { transcript: ev.transcript },
-          `[TURN] FINAL TRANSCRIPT: User transcript finalized: "${ev.transcript}"`,
+          { generationId: newGen.id },
+          `[TURN] LLM_REPLY_REQUESTED: Generation #${newGen.id} sent to LiveKit LLM`,
         );
-        const newGen = coordinator.startGeneration({ transcript: ev.transcript });
-        logger.info(
-          { generationId: newGen.id, transcript: ev.transcript },
-          `[TURN] GENERATION_STARTED: New generation #${newGen.id} started`,
+      } catch (error) {
+        logger.error(
+          { error, generationId: newGen.id },
+          `[TURN] LLM_REPLY_FAILED: Generation #${newGen.id} failed`,
         );
       }
-    });
+    }
+  },
+);
 
     // 3. Speech created: ensure initial/programmatic turns establish an active generation
     session.on(voice.AgentSessionEventTypes.SpeechCreated, (ev) => {
