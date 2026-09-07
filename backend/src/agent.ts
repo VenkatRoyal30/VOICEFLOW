@@ -1,8 +1,7 @@
 import 'dotenv/config';
 
-import { cli, defineAgent, ServerOptions, voice, type JobContext } from '@livekit/agents';
+import { cli, defineAgent, inference, ServerOptions, voice, type JobContext } from '@livekit/agents';
 import * as deepgram from '@livekit/agents-plugin-deepgram';
-import * as openai from '@livekit/agents-plugin-openai';
 import * as rime from '@livekit/agents-plugin-rime';
 import { RemoteParticipant, RoomEvent, TrackKind, TrackSource } from '@livekit/rtc-node';
 import { fileURLToPath } from 'node:url';
@@ -52,9 +51,8 @@ const agent = defineAgent({
 
     const session = new voice.AgentSession({
       stt: deepgramSTT,
-      llm: openai.LLM.withOllama({
-        model: 'llama3.2',
-        baseURL: 'http://localhost:11434/v1',
+      llm: new inference.LLM({
+        model: 'google/gemma-4-31b-it',
       }),
       tts: new rime.TTS({
         modelId: 'coda',
