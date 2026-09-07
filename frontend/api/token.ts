@@ -19,7 +19,8 @@ function sendJson(
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    response.status(statusCode).json(body);
+    response.status(statusCode);
+    response.json(body);
   } else {
     response.writeHead(statusCode, {
       'content-type': 'application/json; charset=utf-8',
@@ -152,7 +153,7 @@ export default async function handler(
       for (const d of dispatches) {
         if (d.agentName === 'voiceflow') {
           const jobs = d.state?.jobs ?? [];
-          const hasPendingOrRunning = jobs.some((j) => {
+          const hasPendingOrRunning = jobs.some((j: { state?: { status?: unknown } }) => {
             const s = j.state?.status as number | undefined;
             return s === 0 || s === 1; // JS_PENDING or JS_RUNNING
           });
