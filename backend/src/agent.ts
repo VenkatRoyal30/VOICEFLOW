@@ -141,15 +141,7 @@ const agent = defineAgent({
         `[TURN] FINAL TRANSCRIPT: User transcript finalized: "${ev.transcript}"`,
       );
 
-      const newGen = coordinator.startGeneration({
-        transcript: ev.transcript,
-      });
-
-      logger.info(
-        { generationId: newGen.id, transcript: ev.transcript },
-        `[TURN] GENERATION_STARTED: New generation #${newGen.id} started`,
-      );
-
+      
       logger.info(
   { transcript: ev.transcript },
   '[TURN] FINAL TRANSCRIPT: letting LiveKit AgentSession handle the reply',
