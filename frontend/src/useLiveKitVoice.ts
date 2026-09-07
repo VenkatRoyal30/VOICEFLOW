@@ -272,37 +272,52 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
     setAudioVolume(0);
   }, []);
 
-  // Fetch token from backend token server
+  // Fetch token from backend token server or Vercel serverless function
   const fetchLiveKitToken = async (
     targetRoom: string,
     identity: string,
   ): Promise<{ serverUrl: string; participantToken: string }> => {
-    // 1. Try relative URL via Vite dev proxy (/api/token)
+    const tokenUrl = `/api/token?room=${encodeURIComponent(targetRoom)}&identity=${encodeURIComponent(identity)}`;
+
+    // 1. Primary path: /api/token (Vercel serverless function in production, Vite dev proxy in local development)
     try {
-      const res = await fetch(
-        `/api/token?room=${encodeURIComponent(targetRoom)}&identity=${encodeURIComponent(identity)}`,
-      );
+      const res = await fetch(tokenUrl);
       if (res.ok) {
         return await res.json();
       }
-    } catch {
-      // Proxy failed or not active, fallback to direct port
+
+      const errJson = await res.json().catch(() => ({}));
+      const errorDetail = errJson.error || `Token endpoint returned status ${res.status}`;
+
+      // In production, immediately throw error without localhost fallback
+      if (!import.meta.env.DEV) {
+        throw new Error(`Failed to obtain LiveKit token: ${errorDetail}`);
+      }
+    } catch (err) {
+      // In production, do not attempt localhost fallback
+      if (!import.meta.env.DEV) {
+        throw err instanceof Error ? err : new Error(`Failed to obtain LiveKit token: ${String(err)}`);
+      }
     }
 
-    // 2. Try direct URL to port 3001
-    const directUrl = `http://localhost:3001/token?room=${encodeURIComponent(targetRoom)}&identity=${encodeURIComponent(identity)}`;
-    try {
-      const directRes = await fetch(directUrl);
-      if (directRes.ok) {
-        return await directRes.json();
+    // 2. Local development fallback only: try direct port 3001 if dev proxy is inactive
+    if (import.meta.env.DEV) {
+      const directUrl = `http://localhost:3001/token?room=${encodeURIComponent(targetRoom)}&identity=${encodeURIComponent(identity)}`;
+      try {
+        const directRes = await fetch(directUrl);
+        if (directRes.ok) {
+          return await directRes.json();
+        }
+        const errJson = await directRes.json().catch(() => ({}));
+        throw new Error(errJson.error || `Token server returned status ${directRes.status}`);
+      } catch (err) {
+        throw new Error(
+          `Unable to reach VoiceFlow token server at /api/token or http://localhost:3001.\nEnsure the token server is running by executing: pnpm token:dev\nDetails: ${(err as Error).message}`,
+        );
       }
-      const errJson = await directRes.json().catch(() => ({}));
-      throw new Error(errJson.error || `Token server returned status ${directRes.status}`);
-    } catch (err) {
-      throw new Error(
-        `Unable to reach VoiceFlow token server at http://localhost:3001.\nEnsure the token server is running by executing: pnpm token:dev\nDetails: ${(err as Error).message}`,
-      );
     }
+
+    throw new Error('Failed to obtain LiveKit token from /api/token');
   };
 
   // Connect to LiveKit room
