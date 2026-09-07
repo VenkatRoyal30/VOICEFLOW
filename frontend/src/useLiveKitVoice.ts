@@ -138,22 +138,8 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
       return false;
     }
 
-    // 4. LiveKit ParticipantKind.STANDARD is always a human user, NEVER the agent
-    if (p.kind === ParticipantKind.STANDARD) {
-      return false;
-    }
-
-    // 5. Participants with explicit non-agent permission must be rejected
-    if (p.permissions && p.permissions.agent === false) {
-      return false;
-    }
-
-    // 6. Explicit LiveKit agent markers
-    if (p.isAgent === true) return true;
-    if (p.kind === ParticipantKind.AGENT) return true;
-    if (p.permissions && p.permissions.agent === true) return true;
-
-    // 7. Identity or name matches the VoiceFlow agent worker ('voiceflow' or 'agent-...')
+    // 4. Positive Agent matching:
+    // Identity or name matches the VoiceFlow agent worker ('voiceflow' or 'agent-...')
     const id = p.identity.toLowerCase();
     if (id === 'voiceflow' || id.startsWith('agent-') || id.startsWith('agent_')) {
       return true;
@@ -161,6 +147,21 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
     const name = (p.name || '').toLowerCase();
     if (name === 'voiceflow' || name.startsWith('agent-') || name.startsWith('agent_')) {
       return true;
+    }
+
+    // Explicit LiveKit agent markers
+    if (p.isAgent === true) return true;
+    if (p.kind === ParticipantKind.AGENT) return true;
+    if (p.permissions && p.permissions.agent === true) return true;
+
+    // 5. Participants with explicit non-agent permission must be rejected
+    if (p.permissions && p.permissions.agent === false) {
+      return false;
+    }
+
+    // 6. LiveKit ParticipantKind.STANDARD is a human user if not matched above
+    if (p.kind === ParticipantKind.STANDARD) {
+      return false;
     }
 
     return false;
@@ -454,7 +455,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
             addEvent(
               'SPEAKING',
               activeGenIdRef.current,
-              `Subscribed to VoiceFlow agent audio (Rime Coda TTS from ${participant.identity})`,
+              `Subscribed to VoiceFlow agent audio (LiveKit Inference TTS from ${participant.identity})`,
               undefined,
               'backend',
             );
@@ -602,7 +603,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
                   addEvent(
                     'GENERATION_STARTED',
                     currentId,
-                    `Deepgram STT finalized: "${seg.text.trim()}"`,
+                    `Inference STT finalized: "${seg.text.trim()}"`,
                     undefined,
                     'livekit',
                   );
@@ -764,7 +765,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
           addEvent(
             'LISTENING',
             101,
-            'Microphone track published to LiveKit. Deepgram STT ready.',
+            'Microphone track published to LiveKit. Inference STT ready.',
             undefined,
             'livekit',
           );

@@ -117,37 +117,11 @@ export default async function handler(
     );
 
     // 1. Check if the VoiceFlow agent is already active in the room
-    let agentInRoom = false;
+    let hasActiveJobOrRecentDispatch = false;
+
+    // 1. Inspect existing dispatches if room exists
     try {
-      const participants = await roomServiceClient.listParticipants(room);
-      for (const p of participants) {
-        if (
-          (p.kind as number) === 0 /* STANDARD */ &&
-          p.identity !== identity &&
-          (!p.tracks || p.tracks.length === 0)
-        ) {
-          try {
-            await roomServiceClient.removeParticipant(room, p.identity);
-          } catch {
-            // Ignore if participant already disconnected
-          }
-        }
-      }
-
-      agentInRoom = participants.some(
-        (p) =>
-          (p.kind as number) === 4 /* ParticipantKind.AGENT */ ||
-          p.identity.startsWith('agent-') ||
-          p.identity === 'voiceflow',
-      );
-    } catch {
-      // Room might not exist yet before first participant connects
-    }
-
-    if (!agentInRoom) {
-      // 2. Inspect existing dispatches
       const dispatches = await dispatchClient.listDispatch(room);
-      let hasActiveJobOrRecentDispatch = false;
       const now = Date.now();
 
       for (const d of dispatches) {
@@ -174,10 +148,52 @@ export default async function handler(
           }
         }
       }
+    } catch {
+      // Room does not exist yet (404), perfectly normal
+    }
 
-      // 3. Create fresh dispatch only if no active or recent dispatch exists
-      if (!hasActiveJobOrRecentDispatch) {
+    // 2. Clean up stale/zombie agent participants if no active dispatch
+    if (!hasActiveJobOrRecentDispatch) {
+      try {
+        const participants = await roomServiceClient.listParticipants(room);
+        for (const p of participants) {
+          if (
+            (p.kind as number) === 0 /* STANDARD */ &&
+            p.identity !== identity &&
+            (!p.tracks || p.tracks.length === 0)
+          ) {
+            try {
+              await roomServiceClient.removeParticipant(room, p.identity);
+            } catch {
+              // Ignore
+            }
+          }
+        }
+
+        const agentParticipants = participants.filter(
+          (p) =>
+            (p.kind as number) === 4 /* ParticipantKind.AGENT */ ||
+            p.identity.startsWith('agent-') ||
+            p.identity === 'voiceflow',
+        );
+        for (const ap of agentParticipants) {
+          try {
+            await roomServiceClient.removeParticipant(room, ap.identity);
+          } catch {
+            // Ignore
+          }
+        }
+      } catch {
+        // Room does not exist yet, normal
+      }
+    }
+
+    // 3. Create fresh dispatch if no active or recent dispatch exists
+    if (!hasActiveJobOrRecentDispatch) {
+      try {
         await dispatchClient.createDispatch(room, 'voiceflow');
+      } catch (err: unknown) {
+        console.warn('createDispatch notice:', (err as Error).message);
       }
     }
   } catch (err: unknown) {

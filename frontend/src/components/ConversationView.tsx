@@ -20,7 +20,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
           <span>Conversational Turn Stream</span>
         </h2>
         <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-faint)' }}>
-          Deepgram STT ➔ Rime TTS
+          LiveKit Inference STT ➔ TTS
         </span>
       </div>
 
@@ -43,9 +43,9 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
             }}
           >
             {/* Header info */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>
-                {msg.role === 'user' ? 'USER' : 'VOICEFLOW (Rime Coda)'}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <span className="mono" style={{ fontSize: '0.72rem', fontWeight: 700, color: msg.role === 'user' ? 'var(--color-cyan)' : 'var(--color-green)' }}>
+                {msg.role === 'user' ? 'USER' : 'VOICEFLOW (Inference TTS)'}
               </span>
               <span
                 className="mono"

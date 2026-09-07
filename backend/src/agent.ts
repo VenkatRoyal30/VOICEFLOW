@@ -1,10 +1,13 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { cli, defineAgent, inference, ServerOptions, voice, type JobContext } from '@livekit/agents';
-import * as deepgram from '@livekit/agents-plugin-deepgram';
-import * as rime from '@livekit/agents-plugin-rime';
 import { RemoteParticipant, RoomEvent, TrackKind, TrackSource } from '@livekit/rtc-node';
-import { fileURLToPath } from 'node:url';
 
 import { loadAgentEnvironment } from './config.js';
 import { GenerationCoordinator } from './coordinator.js';
@@ -15,25 +18,26 @@ import { VOICEFLOW_SYSTEM_PROMPT } from './prompts.js';
 const agent = defineAgent({
   entry: async (ctx: JobContext) => {
     loadAgentEnvironment();
+    await ctx.connect();
 
     const coordinator = new GenerationCoordinator(100);
     const slowAnalysisTool = createSlowAnalysisTool(coordinator);
 
-    const deepgramSTT = new deepgram.STT({
-      model: 'nova-3',
-      language: 'en-US',
+    const sttModel = (process.env.LIVEKIT_STT_MODEL as any) || 'deepgram/nova-3';
+    const stt = new inference.STT({
+      model: sttModel,
     });
 
     // Instrument STT stream to log when opened and when audio frames arrive
-    const originalSttStream = deepgramSTT.stream.bind(deepgramSTT);
-    deepgramSTT.stream = (options) => {
-      logger.info({ model: 'nova-3', language: 'en-US' }, '[TURN] DEEPGRAM STREAM: Stream opened');
+    const originalSttStream = stt.stream.bind(stt);
+    stt.stream = (options) => {
+      logger.info({ model: sttModel }, '[TURN] LIVEKIT INFERENCE STT STREAM: Stream opened');
       const speechStream = originalSttStream(options);
       let frameCount = 0;
       const originalPushFrame = speechStream.pushFrame.bind(speechStream);
       speechStream.pushFrame = (frame) => {
         frameCount++;
-        if (frameCount === 1 || frameCount % 100 === 0) {
+        if (frameCount === 1 || frameCount % 25 === 0) {
           logger.info(
             {
               framesReceived: frameCount,
@@ -41,7 +45,7 @@ const agent = defineAgent({
               channels: frame.channels,
               samplesPerChannel: frame.samplesPerChannel,
             },
-            `[TURN] MIC AUDIO \u2192 DEEPGRAM STREAM: ${frameCount} audio frames received`,
+            `[MIC AUDIO] Audio frame #${frameCount} received by STT stream (${frame.samplesPerChannel} samples @ ${frame.sampleRate}Hz)`,
           );
         }
         return originalPushFrame(frame);
@@ -49,23 +53,70 @@ const agent = defineAgent({
       return speechStream;
     };
 
+    const ttsModel = (process.env.LIVEKIT_TTS_MODEL as any) || 'cartesia/sonic-3.5';
+    const tts = new inference.TTS({
+      model: ttsModel,
+      fallback: ['deepgram/aura-2'],
+    });
+
+    tts.on('error', (err) => {
+      logger.error({ err }, '[TTS ERROR] LiveKit Inference TTS error event');
+    });
+
+    const originalTtsStream = tts.stream.bind(tts);
+    tts.stream = (options) => {
+      logger.info({ model: ttsModel }, '[TTS START] LIVEKIT INFERENCE TTS STREAM: Synthesis stream opened');
+      const stream = originalTtsStream(options);
+
+      let accumulatedTtsText = '';
+      const origPushText = stream.pushText.bind(stream);
+      stream.pushText = (text: string) => {
+        accumulatedTtsText += text;
+        logger.info(
+          { chunk: text, accumulatedLength: accumulatedTtsText.length },
+          `[TTS CHUNK] Pushed text chunk to TTS: "${text}"`,
+        );
+        return origPushText(text);
+      };
+
+      const origFlush = stream.flush.bind(stream);
+      stream.flush = () => {
+        logger.info(
+          { totalLength: accumulatedTtsText.length },
+          `[TTS FLUSH] Stream flushed (total accumulated text: "${accumulatedTtsText}")`,
+        );
+        return origFlush();
+      };
+
+      const origEndInput = stream.endInput.bind(stream);
+      stream.endInput = () => {
+        logger.info(
+          { completeTtsText: accumulatedTtsText, length: accumulatedTtsText.length },
+          `[TTS COMPLETION] Synthesis input ended. COMPLETE TTS TEXT: "${accumulatedTtsText}"`,
+        );
+        return origEndInput();
+      };
+
+      return stream;
+    };
+
     const session = new voice.AgentSession({
-      stt: deepgramSTT,
+      stt,
       llm: new inference.LLM({
         model: 'google/gemma-4-31b-it',
       }),
-      tts: new rime.TTS({
-        modelId: 'coda',
-        speaker: 'celeste',
-        useWebsocket: true,
-        segment: 'immediate',
-      }),
-      vad: null,
-      turnDetection: 'stt',
+      tts,
       turnHandling: {
         endpointing: {
-          minDelay: 100,
-          maxDelay: 1500,
+          minDelay: 300,
+          maxDelay: 2000,
+        },
+        interruption: {
+          enabled: true,
+          minDuration: 1000, // require at least 1s of sustained speech to avoid speaker echo
+          minWords: 2, // require at least 2 recognized words to confirm user barge-in
+          falseInterruptionTimeout: 3000,
+          resumeFalseInterruption: true,
         },
         preemptiveGeneration: {
           enabled: true,
@@ -79,63 +130,63 @@ const agent = defineAgent({
       },
     });
 
-    // 1. User state changed: detect barge-in ONLY when user starts speaking while the agent is speaking
+    // 1. User state changed: log microphone activity without false premature interruption
     session.on(voice.AgentSessionEventTypes.UserStateChanged, (ev) => {
       logger.info(
         { oldState: ev.oldState, newState: ev.newState },
         ev.newState === 'speaking'
-          ? '[TURN] SPEECH START: User speech detected'
-          : '[TURN] SPEECH END: User speech stopped',
+          ? '[USER TURN START] User speech activity detected'
+          : '[USER TURN END] User speech activity stopped',
       );
+    });
 
-      if (ev.newState === 'speaking') {
-        const isAgentSpeaking = session.agentState === 'speaking' || coordinator.getState() === 'SPEAKING';
-        if (!isAgentSpeaking) {
-          logger.debug(
-            { agentState: session.agentState, coordinatorState: coordinator.getState() },
-            'User speaking while agent is not speaking; ignoring as barge-in',
-          );
-          return;
-        }
-
-        const interruptedId = coordinator.getActiveGenerationId();
-        logger.info(
-          {
-            oldState: ev.oldState,
-            agentState: session.agentState,
-            activeGenerationId: interruptedId,
-          },
-          '[INTERRUPTION] GENERATION_INVALIDATED \u2192 cancellation signal fired \u2192 old task terminated \u2192 awaiting new generation',
-        );
+    // Interruption events: LiveKit native interruption and false interruption recovery
+    session.on(voice.AgentSessionEventTypes.OverlappingSpeech, (ev) => {
+      logger.info(
+        { isInterruption: ev.isInterruption },
+        `[INTERRUPTION] Overlapping speech detected (isInterruption: ${ev.isInterruption})`,
+      );
+      if (ev.isInterruption) {
         coordinator.interrupt('user_barge_in');
-        try {
-          const fut = session.interrupt();
-          void fut.await
-            .then(() => {
-              logger.info(
-                { interruptedGenerationId: interruptedId },
-                '[INTERRUPTION] Old speech task terminated cleanly',
-              );
-            })
-            .catch((err: unknown) => {
-              logger.debug({ err }, 'Speech interruption completed or no speech playing');
-            });
-        } catch (err: unknown) {
-          logger.debug({ err }, 'Session interrupt call threw synchronously');
-        }
       }
     });
 
-    // 2. User input transcribed: finalized user turn starts a fresh generation
+    session.on(voice.AgentSessionEventTypes.AgentFalseInterruption, (ev) => {
+      logger.warn({ ev }, '[INTERRUPTION] False interruption detected by LiveKit; agent speech resuming');
+    });
+
+    // Capture and log complete LLM text generated before or during TTS synthesis
+    session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (ev) => {
+      if (ev.item && 'role' in ev.item && ev.item.role === 'assistant') {
+        const text =
+          typeof ev.item.content === 'string'
+            ? ev.item.content
+            : Array.isArray(ev.item.content)
+              ? ev.item.content.map((c) => (typeof c === 'string' ? c : (c as any).text || '')).join('')
+              : JSON.stringify(ev.item.content);
+        logger.info(
+          { completeLlmText: text, length: text.length },
+          `[LLM COMPLETE] Complete LLM text generated: "${text}"`,
+        );
+      }
+    });
+
+    // 2. User input transcribed: interim transcripts and finalized user turn
     session.on(voice.AgentSessionEventTypes.UserInputTranscribed, (ev) => {
-      logger.info(
-        { transcript: ev.transcript, isFinal: ev.isFinal },
-        'Deepgram STT transcript received',
-      );
-      if (ev.isFinal && ev.transcript.trim().length > 0) {
+      if (!ev.isFinal && ev.transcript && ev.transcript.trim().length > 0) {
         logger.info(
           { transcript: ev.transcript },
-          `[TURN] FINAL TRANSCRIPT: User transcript finalized: "${ev.transcript}"`,
+          `[STT INTERIM] Interim transcript: "${ev.transcript}"`,
+        );
+      }
+      if (ev.isFinal && ev.transcript && ev.transcript.trim().length > 0) {
+        logger.info(
+          { transcript: ev.transcript },
+          `[STT FINAL] Final transcript: "${ev.transcript}"`,
+        );
+        logger.info(
+          { transcript: ev.transcript },
+          `[USER TURN END] User turn finalized with transcript: "${ev.transcript}"`,
         );
         const newGen = coordinator.startGeneration({ transcript: ev.transcript });
         logger.info(
@@ -147,6 +198,7 @@ const agent = defineAgent({
 
     // 3. Speech created: ensure initial/programmatic turns establish an active generation
     session.on(voice.AgentSessionEventTypes.SpeechCreated, (ev) => {
+      logger.info({ source: ev.source }, `[AGENT REPLY START] Speech synthesis created for source: ${ev.source}`);
       if (ev.source === 'generate_reply' || ev.source === 'say') {
         const activeGen = coordinator.getActiveGeneration();
         if (!activeGen || !activeGen.isValid) {
@@ -164,10 +216,16 @@ const agent = defineAgent({
       if (ev.newState === 'speaking') {
         logger.info(
           { generationId: coordinator.getActiveGenerationId() },
-          `[TURN] TTS \u2192 SPEAKING: Rime TTS playback active for generation #${coordinator.getActiveGenerationId()}`,
+          `[AGENT REPLY START] Agent started speaking generation #${coordinator.getActiveGenerationId()}`,
         );
         coordinator.transitionState('SPEAKING');
-      } else if (ev.newState === 'thinking') {
+      } else if (ev.oldState === 'speaking') {
+        logger.info(
+          { oldState: ev.oldState, newState: ev.newState, generationId: coordinator.getActiveGenerationId() },
+          `[AGENT SPEECH END] Agent stopped speaking (now in ${ev.newState} state)`,
+        );
+      }
+      if (ev.newState === 'thinking') {
         logger.info(
           { generationId: coordinator.getActiveGenerationId() },
           `[TURN] LLM/TOOL: LLM thinking for generation #${coordinator.getActiveGenerationId()}`,
@@ -182,7 +240,7 @@ const agent = defineAgent({
     session.on(voice.AgentSessionEventTypes.Error, (ev) => {
       const outer = ev.error as unknown as Record<string, unknown>;
       const inner = (outer && typeof outer === 'object' && 'error' in outer ? outer.error : outer) as
-        | { message?: string; name?: string; statusCode?: number }
+        | { message?: string; name?: string; statusCode?: number; stack?: string }
         | undefined;
       logger.error(
         {
@@ -191,8 +249,9 @@ const agent = defineAgent({
           message: inner?.message ?? (outer as { message?: string })?.message,
           name: inner?.name,
           statusCode: inner?.statusCode,
+          stack: inner?.stack,
         },
-        'AgentSession provider error',
+        '[AGENT ERROR] LiveKit AgentSession provider error (STT/LLM/TTS)',
       );
     });
 
@@ -229,7 +288,8 @@ const agent = defineAgent({
         for (const p of ctx.room.remoteParticipants.values()) {
           for (const pub of p.trackPublications.values()) {
             if (
-              (pub.kind === TrackKind.KIND_AUDIO || (pub.track && pub.track.kind === TrackKind.KIND_AUDIO)) &&
+              pub.kind === TrackKind.KIND_AUDIO ||
+              (pub.track && pub.track.kind === TrackKind.KIND_AUDIO) ||
               pub.source === TrackSource.SOURCE_MICROPHONE
             ) {
               participantToLink = p;
@@ -278,7 +338,7 @@ const agent = defineAgent({
         },
         'Remote microphone track published by participant',
       );
-      if (publication.source === TrackSource.SOURCE_MICROPHONE) {
+      if (publication.kind === TrackKind.KIND_AUDIO || publication.source === TrackSource.SOURCE_MICROPHONE) {
         syncActiveAudioParticipant(participant);
       }
     });
@@ -293,12 +353,10 @@ const agent = defineAgent({
         },
         'Remote microphone audio track subscribed on backend',
       );
-      if (publication.source === TrackSource.SOURCE_MICROPHONE) {
+      if (track.kind === TrackKind.KIND_AUDIO || publication.source === TrackSource.SOURCE_MICROPHONE) {
         syncActiveAudioParticipant(participant);
       }
     });
-
-    await ctx.connect();
 
     await session.start({
       room: ctx.room,
@@ -306,6 +364,9 @@ const agent = defineAgent({
         instructions: VOICEFLOW_SYSTEM_PROMPT,
         tools: [slowAnalysisTool],
       }),
+      inputOptions: {
+        closeOnDisconnect: false,
+      },
     });
 
     // Ensure audio input is linked to any active participant already in room

@@ -7,8 +7,8 @@ const liveKitEnvironmentSchema = z.object({
 });
 
 const agentEnvironmentSchema = liveKitEnvironmentSchema.extend({
-  RIME_API_KEY: z.string().min(1),
-  DEEPGRAM_API_KEY: z.string().min(1),
+  RIME_API_KEY: z.string().min(1).optional(),
+  DEEPGRAM_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional().default('ollama'),
 });
 

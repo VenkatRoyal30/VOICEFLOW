@@ -182,7 +182,7 @@ export const GenerationCard: React.FC<GenerationCardProps> = ({ activeGen, previ
         <span>
           {activeGen.source === 'simulation'
             ? 'ℹ️ Presentation Simulation Mode: Demonstrates abort and stale-result fencing without requiring live audio.'
-            : 'ℹ️ Real LiveKit Audio Session: Speech turns trigger Deepgram STT, Ollama inference, and Rime Coda playback.'}
+            : 'ℹ️ Real LiveKit Audio Session: Speech turns trigger LiveKit Inference STT, Gemma LLM, and Inference TTS playback.'}
         </span>
         <span className="mono">backend/src/coordinator.ts</span>
       </div>

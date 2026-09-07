@@ -12,3 +12,5 @@ console-recordings/
 *.zip
 
 *.tsbuildinfo
+.vercel
+.env*

@@ -168,7 +168,7 @@ export const App: React.FC = () => {
 
       {/* Footer */}
       <footer style={{ marginTop: '32px', textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.75rem', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }} className="mono">
-        VoiceFlow • DataForge 2026 Rime Hackathon Submission • LiveKit Agents 1.8.0 • Deepgram Nova-3 • Ollama Llama 3.2 • Rime Coda TTS
+        VoiceFlow • Realtime Voice Assistant • LiveKit Agents 1.8.0 • LiveKit Inference STT • Gemma 4 31B LLM • LiveKit Inference TTS
       </footer>
 
     </div>

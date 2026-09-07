@@ -60,7 +60,7 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
     switch (state) {
       case 'SPEAKING':
         return {
-          label: 'Speaking (Rime Coda)',
+          label: 'Speaking (Inference TTS)',
           color: 'var(--color-green)',
           glow: 'var(--shadow-glow-green)',
           badgeClass: 'badge-speaking',
@@ -93,7 +93,7 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
       case 'LISTENING':
       default:
         return {
-          label: isUserSpeaking ? 'User Speaking (Voice Detected)' : 'Listening (Deepgram STT)',
+          label: isUserSpeaking ? 'User Speaking (Voice Detected)' : 'Listening (Inference STT)',
           color: 'var(--color-cyan)',
           glow: 'var(--shadow-glow-cyan)',
           badgeClass: 'badge-active',
