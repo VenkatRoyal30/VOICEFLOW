@@ -28,28 +28,11 @@ const agent = defineAgent({
       model: sttModel,
     });
 
-    // Instrument STT stream to log when opened and when audio frames arrive
+    // Instrument STT stream to log when opened
     const originalSttStream = stt.stream.bind(stt);
     stt.stream = (options) => {
       logger.info({ model: sttModel }, '[TURN] LIVEKIT INFERENCE STT STREAM: Stream opened');
       const speechStream = originalSttStream(options);
-      let frameCount = 0;
-      const originalPushFrame = speechStream.pushFrame.bind(speechStream);
-      speechStream.pushFrame = (frame) => {
-        frameCount++;
-        if (frameCount === 1 || frameCount % 25 === 0) {
-          logger.info(
-            {
-              framesReceived: frameCount,
-              sampleRate: frame.sampleRate,
-              channels: frame.channels,
-              samplesPerChannel: frame.samplesPerChannel,
-            },
-            `[MIC AUDIO] Audio frame #${frameCount} received by STT stream (${frame.samplesPerChannel} samples @ ${frame.sampleRate}Hz)`,
-          );
-        }
-        return originalPushFrame(frame);
-      };
       return speechStream;
     };
 
@@ -318,7 +301,7 @@ const agent = defineAgent({
         tools: [slowAnalysisTool],
       }),
       inputOptions: {
-        closeOnDisconnect: false,
+        closeOnDisconnect: true,
       },
     });
 
