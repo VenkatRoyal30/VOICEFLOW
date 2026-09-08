@@ -49,9 +49,19 @@ interface UseLiveKitVoiceReturn {
   resetDemoSession: () => void;
 }
 
-export function useLiveKitVoice(): UseLiveKitVoiceReturn {
+// Generate a unique room ID per browser session: voiceflow-${randomSessionId}
+// Preserved across React re-renders and reconnections; freshly generated on page refresh/reopen.
+const generateSessionRoomId = (): string => {
+  const randomSessionId = Math.random().toString(36).substring(2, 9);
+  return `voiceflow-${randomSessionId}`;
+};
+
+// Module-scoped session room ID created once per browser page load
+const PAGE_SESSION_ROOM_ID = generateSessionRoomId();
+
+export function useLiveKitVoice(defaultRoom: string = PAGE_SESSION_ROOM_ID): UseLiveKitVoiceReturn {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
-  const [roomName, setRoomName] = useState<string>('voiceflow-demo');
+  const [roomName, setRoomName] = useState<string>(defaultRoom);
   const [agentState, setAgentState] = useState<AgentState>('LISTENING');
   const [activeGenerationId, setActiveGenerationId] = useState<number>(101);
   const [isMicActive, setIsMicActive] = useState<boolean>(false);
@@ -323,7 +333,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
 
   // Connect to LiveKit room
   const connect = useCallback(
-    async (targetRoom: string = 'voiceflow-demo') => {
+    async (targetRoom: string = defaultRoom) => {
       if (isConnectingRef.current) return;
       if (
         roomRef.current &&
@@ -811,7 +821,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
         isConnectingRef.current = false;
       }
     },
-    [addEvent, attachAgentAudioTrack, cleanupAgentAudio, detachAgentAudioTrack, isAgentParticipant, startVolumeMonitor, stopVolumeMonitor],
+    [addEvent, attachAgentAudioTrack, cleanupAgentAudio, defaultRoom, detachAgentAudioTrack, isAgentParticipant, startVolumeMonitor, stopVolumeMonitor],
   );
 
   // Disconnect from LiveKit room
