@@ -273,54 +273,11 @@ const agent = defineAgent({
       );
     });
 
-    // Function to ensure RoomIO links to the active participant publishing microphone audio
-    const syncActiveAudioParticipant = (targetParticipant?: RemoteParticipant) => {
-      const roomIO = (
-        session as unknown as {
-          _roomIO?: {
-            setParticipant: (id: string) => void;
-            participantIdentity?: string | null;
-          };
-        }
-      )._roomIO;
-
-      if (!roomIO) return;
-
-      let participantToLink = targetParticipant;
-      if (!participantToLink) {
-        for (const p of ctx.room.remoteParticipants.values()) {
-          for (const pub of p.trackPublications.values()) {
-            if (
-              pub.kind === TrackKind.KIND_AUDIO ||
-              (pub.track && pub.track.kind === TrackKind.KIND_AUDIO) ||
-              pub.source === TrackSource.SOURCE_MICROPHONE
-            ) {
-              participantToLink = p;
-              break;
-            }
-          }
-          if (participantToLink) break;
-        }
-      }
-
-      if (participantToLink && roomIO.participantIdentity !== participantToLink.identity) {
-        logger.info(
-          {
-            previousLinkedParticipant: roomIO.participantIdentity,
-            newLinkedParticipant: participantToLink.identity,
-          },
-          'Binding agent audio input to active microphone participant',
-        );
-        roomIO.setParticipant(participantToLink.identity);
-      }
-    };
-
     ctx.room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       logger.info(
         { participant: participant.identity, kind: participant.kind },
         'Remote participant connected to room',
       );
-      syncActiveAudioParticipant(participant);
     });
 
     ctx.room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
@@ -328,7 +285,6 @@ const agent = defineAgent({
         { participant: participant.identity },
         'Remote participant disconnected from room',
       );
-      syncActiveAudioParticipant();
     });
 
     ctx.room.on(RoomEvent.TrackPublished, (publication, participant: RemoteParticipant) => {
@@ -341,9 +297,6 @@ const agent = defineAgent({
         },
         'Remote microphone track published by participant',
       );
-      if (publication.kind === TrackKind.KIND_AUDIO || publication.source === TrackSource.SOURCE_MICROPHONE) {
-        syncActiveAudioParticipant(participant);
-      }
     });
 
     ctx.room.on(RoomEvent.TrackSubscribed, (track, publication, participant: RemoteParticipant) => {
@@ -356,9 +309,6 @@ const agent = defineAgent({
         },
         'Remote microphone audio track subscribed on backend',
       );
-      if (track.kind === TrackKind.KIND_AUDIO || publication.source === TrackSource.SOURCE_MICROPHONE) {
-        syncActiveAudioParticipant(participant);
-      }
     });
 
     await session.start({
@@ -371,9 +321,6 @@ const agent = defineAgent({
         closeOnDisconnect: false,
       },
     });
-
-    // Ensure audio input is linked to any active participant already in room
-    syncActiveAudioParticipant();
 
     logger.info({ room: ctx.room.name }, 'VoiceFlow session started');
   },
