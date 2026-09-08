@@ -412,14 +412,10 @@ export function useLiveKitVoice(defaultRoom: string = PAGE_SESSION_ROOM_ID): Use
               undefined,
               'backend',
             );
-            for (const pub of participant.trackPublications.values()) {
-              if (pub.kind === Track.Kind.Audio) {
-                pub.setSubscribed(true);
-              }
-            }
-          } else {
-            for (const pub of participant.trackPublications.values()) {
-              pub.setSubscribed(false);
+          }
+          for (const pub of participant.trackPublications.values()) {
+            if (pub.kind === Track.Kind.Audio) {
+              pub.setSubscribed(true);
             }
           }
         });
@@ -434,16 +430,12 @@ export function useLiveKitVoice(defaultRoom: string = PAGE_SESSION_ROOM_ID): Use
           addEvent('DISCONNECTED', activeGenIdRef.current, 'Disconnected from LiveKit room');
         });
 
-        // Track Published handler: ONLY subscribe to tracks from VoiceFlow Agent
+        // Track Published handler: subscribe to remote audio tracks
         room.on(
           RoomEvent.TrackPublished,
-          (publication: RemoteTrackPublication, participant: RemoteParticipant) => {
+          (publication: RemoteTrackPublication, _participant: RemoteParticipant) => {
             if (publication.kind === Track.Kind.Audio) {
-              if (isAgentParticipant(participant)) {
-                publication.setSubscribed(true);
-              } else {
-                publication.setSubscribed(false);
-              }
+              publication.setSubscribed(true);
             }
           },
         );
