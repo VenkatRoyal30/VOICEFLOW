@@ -123,7 +123,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
         {/* Processing Indicator */}
         {isProcessing && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-amber)', fontSize: '0.8rem', padding: '6px 0' }}>
-            <span className="mono">Agent is processing tool request...</span>
+            <span className="mono">Agent is thinking...</span>
           </div>
         )}
       </div>

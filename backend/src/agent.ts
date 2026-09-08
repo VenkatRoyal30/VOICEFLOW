@@ -114,7 +114,7 @@ const agent = defineAgent({
         interruption: {
           enabled: true,
           minDuration: 1000, // require at least 1s of sustained speech to avoid speaker echo
-          minWords: 2, // require at least 2 recognized words to confirm user barge-in
+          minWords: 0,
           falseInterruptionTimeout: 3000,
           resumeFalseInterruption: true,
         },
