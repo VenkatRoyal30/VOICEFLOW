@@ -376,10 +376,6 @@ const agent = defineAgent({
     syncActiveAudioParticipant();
 
     logger.info({ room: ctx.room.name }, 'VoiceFlow session started');
-
-    await session.generateReply({
-      instructions: 'Greet the user briefly and ask how you can help.',
-    });
   },
 });
 
