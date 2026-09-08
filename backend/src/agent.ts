@@ -107,20 +107,23 @@ const agent = defineAgent({
       }),
       tts,
       turnHandling: {
+        turnDetection: new inference.TurnDetector(),
         endpointing: {
           minDelay: 300,
           maxDelay: 2000,
         },
         interruption: {
+          mode: 'adaptive',
           enabled: true,
-          minDuration: 1000, // require at least 1s of sustained speech to avoid speaker echo
+          minDuration: 1000,
           minWords: 0,
           falseInterruptionTimeout: 3000,
           resumeFalseInterruption: true,
+          discardAudioIfUninterruptible: true,
         },
         preemptiveGeneration: {
           enabled: true,
-          preemptiveTts: true,
+          preemptiveTts: false,
         },
       },
       connOptions: {
