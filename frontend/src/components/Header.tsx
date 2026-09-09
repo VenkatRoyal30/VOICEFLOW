@@ -94,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({ status, roomName, onConnect, onD
 
           <div className="glass-panel mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.4)' }}>
             <Activity size={14} color="#10b981" />
-            <span style={{ color: '#cbd5e1' }}>Inference STT</span>
+            <span style={{ color: '#cbd5e1' }}>Deepgram Nova-3</span>
           </div>
 
           <div className="glass-panel mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.4)' }}>
@@ -104,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({ status, roomName, onConnect, onD
 
           <div className="glass-panel mono" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '0.75rem', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.4)' }}>
             <Volume2 size={14} color="#00f0ff" />
-            <span style={{ color: '#00f0ff', fontWeight: 600 }}>Inference TTS</span>
+            <span style={{ color: '#00f0ff', fontWeight: 600 }}>Rime Coda</span>
           </div>
         </div>
 
