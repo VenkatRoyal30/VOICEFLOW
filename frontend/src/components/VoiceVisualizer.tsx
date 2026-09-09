@@ -76,7 +76,7 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
         };
       case 'THINKING':
         return {
-          label: 'Thinking (Ollama LLM)',
+          label: 'Thinking (Gemma LLM)',
           color: 'var(--color-purple)',
           glow: '0 0 35px rgba(168, 85, 247, 0.3)',
           badgeClass: 'badge-fenced',

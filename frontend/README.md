@@ -14,7 +14,7 @@ The VoiceFlow Frontend is a modern React + TypeScript + Vite dashboard designed 
   1. *Normal Conversational Turn* (low-latency conversational response)
   2. *Slow Tool Execution* (heavy computation with deliberate 8-second delay)
   3. *User Barge-in Interruption* (instantaneous cutoff, generation invalidation, stale-result fencing, and immediate Rime recovery playback)
-* **Technology Badges:** Highlighting the integrated stack: **LiveKit Agents 1.8**, **Deepgram Nova-3**, **Ollama Llama 3.2**, and **Rime Coda TTS**.
+* **Technology Badges:** Highlighting the integrated stack: **LiveKit Agents 1.8**, **Deepgram Nova-3**, **Gemma 4 31B**, and **Rime Coda TTS**.
 
 ---
 
@@ -66,7 +66,7 @@ The frontend uses the official `livekit-client` SDK to connect directly to the L
    - Connects a Web Audio `AnalyserNode` to drive dynamic equalizer bar animations synchronized with your voice volume.
 3. **Rime TTS Playback:**
    - Subscribes to the agent's incoming audio track via `RoomEvent.TrackSubscribed`.
-   - Attaches the audio track to an HTML `<audio>` element with autoplay, ensuring low-latency streaming audio from Rime Coda (`celeste` voice) plays through your speakers/headphones.
+   - Attaches the audio track to an HTML `<audio>` element with autoplay, ensuring low-latency streaming audio from Rime Coda (`luna` voice) plays through your speakers/headphones.
 4. **Live Transcriptions & Barge-In:**
    - Listens to `RoomEvent.TranscriptionReceived` for Deepgram STT (user) and Rime TTS (agent) transcriptions.
    - Listens to `RoomEvent.ActiveSpeakersChanged` to detect real-time user barge-in over active agent speech, invalidating the current generation and updating the state machine immediately.

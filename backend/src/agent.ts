@@ -36,10 +36,12 @@ const agent = defineAgent({
       return speechStream;
     };
 
-    const ttsModel = (process.env.LIVEKIT_TTS_MODEL as any) || 'cartesia/sonic-3.5';
+    const ttsModel = (process.env.LIVEKIT_TTS_MODEL as any) || 'rime/coda';
+    const ttsVoice = process.env.LIVEKIT_TTS_VOICE || 'luna';
     const tts = new inference.TTS({
       model: ttsModel,
-      fallback: ['deepgram/aura-2'],
+      voice: ttsVoice,
+      language: 'en',
     });
 
     tts.on('error', (err) => {
@@ -48,7 +50,10 @@ const agent = defineAgent({
 
     const originalTtsStream = tts.stream.bind(tts);
     tts.stream = (options) => {
-      logger.info({ model: ttsModel }, '[TTS START] LIVEKIT INFERENCE TTS STREAM: Synthesis stream opened');
+      logger.info(
+        { model: ttsModel, voice: ttsVoice },
+        '[TTS START] LIVEKIT INFERENCE TTS STREAM: Synthesis stream opened',
+      );
       const stream = originalTtsStream(options);
 
       let accumulatedTtsText = '';
